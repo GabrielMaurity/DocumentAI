@@ -93,3 +93,37 @@ jobs:
         run: |
           echo "Deploy: etapa de teste do pipeline. Nenhum recurso do Azure é alterado."
           echo "Futuramente: azure/login via OIDC, publicação no Azure App Service e verificação de GET /health."
+
+  # Envia por e-mail o relatório da execução, com sucesso ou falha.
+  # Configuração (secrets do repositório): SMTP_SERVIDOR, SMTP_PORTA, SMTP_USUARIO, SMTP_SENHA e EMAIL_RELATORIO_DESTINO.
+  # Sem os secrets, o relatório aparece só no resumo da execução e o job emite um aviso.
+  relatorio:
+    name: Relatório
+    runs-on: ubuntu-latest
+    needs: [build, test, deploy]
+    if: always()
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Baixar os resultados dos testes
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: resultados-testes
+          path: TestResults
+
+      - name: Gerar e enviar o relatório
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RESULTADOS_JOBS: ${{ toJSON(needs) }}
+          DIRETORIO_TESTES: TestResults
+          SMTP_SERVIDOR: ${{ secrets.SMTP_SERVIDOR }}
+          SMTP_PORTA: ${{ secrets.SMTP_PORTA }}
+          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
+          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
+          EMAIL_RELATORIO_DESTINO: ${{ secrets.EMAIL_RELATORIO_DESTINO }}
+        run: python3 .github/scripts/relatorio_pipeline.py

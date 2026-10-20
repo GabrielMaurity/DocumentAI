@@ -239,6 +239,29 @@ O workflow [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml) tem três 
 | `build` | push e pull request na `main` | **ativo**: instala o SDK do `global.json`, restaura e compila a solution em `Release` |
 | `test` | depois do `build` | **ativo**: executa `dotnet test` sem a suíte `QualidadeIA` e publica os resultados (`.trx`) como artefato |
 | `deploy` | depois do `test`, apenas em push na `main` | esqueleto: só imprime mensagens; nenhum recurso do Azure é alterado |
+| `relatorio` | sempre, depois de todos os jobs, com sucesso ou falha | **ativo**: envia por e-mail o relatório da execução e o grava no resumo da execução |
+
+### Relatório por e-mail
+
+O job `relatorio` executa [.github/scripts/relatorio_pipeline.py](.github/scripts/relatorio_pipeline.py), que usa apenas a biblioteca padrão do Python. O e-mail traz:
+
+- resultado geral (sucesso, falha ou cancelado) no assunto e no topo;
+- repositório, evento, branch, commit, autor, início e duração;
+- cada job e cada etapa executada, com resultado e duração;
+- totais de testes (aprovados, com falha, não executados) e o nome dos testes que falharam;
+- link para a execução no GitHub Actions.
+
+O envio usa SMTP e é configurado por *secrets* do repositório (*Settings → Secrets and variables → Actions*). O destinatário também fica em *secret* para não expor o endereço no repositório público:
+
+| Secret | Exemplo | Descrição |
+|--------|---------|-----------|
+| `SMTP_SERVIDOR` | `smtp.gmail.com` | Servidor SMTP |
+| `SMTP_PORTA` | `465` | `465` (SSL) ou `587` (STARTTLS); padrão `465` |
+| `SMTP_USUARIO` | conta que envia | Também usado como remetente |
+| `SMTP_SENHA` | senha de app | No Gmail, uma [senha de app](https://myaccount.google.com/apppasswords), nunca a senha da conta |
+| `EMAIL_RELATORIO_DESTINO` | quem recebe | Destinatário do relatório |
+
+Sem esses secrets, o relatório aparece só no resumo da execução e o job emite um aviso, sem falhar o pipeline. Em pull requests vindos de *forks*, o GitHub não disponibiliza os secrets, e o e-mail não é enviado.
 
 O restante (cobertura mínima, varredura de segredos e publicação no Azure App Service via OIDC com aprovação manual) está planejado nas tarefas 10.3 a 10.5 de [docs/tasks.md](docs/tasks.md).
 
