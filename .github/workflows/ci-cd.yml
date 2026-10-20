@@ -1,8 +1,14 @@
-# Pipeline de CI/CD do DocumentAI.
+# Pipeline de CI/CD do DocumentAI (skill .agents/skills/azure-deployment).
 #
-# Build e Test executam a compilação e os testes reais da solution.
-# Deploy ainda é um esqueleto: apenas imprime mensagens e não altera nenhum recurso do Azure.
-# A evolução segue as tarefas 10.3 e 10.4 de docs/tasks.md e a skill .agents/skills/azure-deployment.
+#   Build  -> restaura, compila e gera o pacote de publicação da API.
+#   Test   -> executa os testes automatizados; se falharem, não há deploy.
+#   Deploy -> publica no Azure App Service via OIDC, com aprovação manual (environment "production"),
+#             e valida a aplicação publicada.
+#
+# Configuração no environment "production" do GitHub (sem nenhuma senha ou chave):
+#   secrets   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   variável  AZURE_WEBAPP_NAME
+# Recursos do Azure: infra/provisionar-azure.ps1.
 
 name: CI/CD
 
@@ -17,14 +23,16 @@ on:
 permissions:
   contents: read
 
+# Execuções de pull request são canceladas por novas; deploys nunca são interrompidos no meio.
 concurrency:
   group: ci-cd-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   SOLUTION: DocumentAI.sln
+  PROJETO_API: src/DocumentAI.API/DocumentAI.API.csproj
   CONFIGURATION: Release
 
 jobs:
@@ -45,6 +53,17 @@ jobs:
 
       - name: Compilar
         run: dotnet build ${{ env.SOLUTION }} --configuration ${{ env.CONFIGURATION }} --no-restore
+
+      - name: Gerar o pacote de publicação da API
+        run: dotnet publish ${{ env.PROJETO_API }} --configuration ${{ env.CONFIGURATION }} --no-build --output publish
+
+      - name: Guardar o pacote de publicação
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-publicacao
+          path: publish
+          if-no-files-found: error
+          retention-days: 7
 
   test:
     name: Test
@@ -83,47 +102,75 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: test
-    # Publica apenas em push na main; nunca em pull requests.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # Futuramente: environment "production" com revisores obrigatórios
-    # e "id-token: write" para autenticação no Azure via OIDC.
-    steps:
-      - name: Deploy (placeholder)
-        run: |
-          echo "Deploy: etapa de teste do pipeline. Nenhum recurso do Azure é alterado."
-          echo "Futuramente: azure/login via OIDC, publicação no Azure App Service e verificação de GET /health."
-
-  # Envia por e-mail o relatório da execução, com sucesso ou falha.
-  # Configuração (secrets do repositório): SMTP_SERVIDOR, SMTP_PORTA, SMTP_USUARIO, SMTP_SENHA e EMAIL_RELATORIO_DESTINO.
-  # Sem os secrets, o relatório aparece só no resumo da execução e o job emite um aviso.
-  relatorio:
-    name: Relatório
-    runs-on: ubuntu-latest
-    needs: [build, test, deploy]
-    if: always()
+    # Só publica se o build e os testes passaram.
+    needs: [build, test]
+    # Só publica a partir da main (push ou disparo manual); nunca em pull requests.
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Revisores obrigatórios do environment aprovam cada publicação.
+    environment:
+      name: production
+      url: ${{ steps.publicar.outputs.webapp-url }}/scalar
     permissions:
       contents: read
-      actions: read
+      id-token: write # token OIDC para o login federado no Azure
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Baixar os resultados dos testes
+      - name: Baixar o pacote de publicação
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
-          name: resultados-testes
-          path: TestResults
+          name: api-publicacao
+          path: publish
 
-      - name: Gerar e enviar o relatório
+      - name: Login no Azure (OIDC, sem segredo de longa duração)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Publicar no Azure App Service
+        id: publicar
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: publish
+
+      # O plano gratuito (F1) desliga a aplicação quando ociosa: a primeira resposta pode demorar.
+      # Enquanto o endpoint /health não existir (tarefa 6.3), a validação usa o OpenAPI e o Scalar.
+      - name: Validar a aplicação publicada
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          RESULTADOS_JOBS: ${{ toJSON(needs) }}
-          DIRETORIO_TESTES: TestResults
-          SMTP_SERVIDOR: ${{ secrets.SMTP_SERVIDOR }}
-          SMTP_PORTA: ${{ secrets.SMTP_PORTA }}
-          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
-          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
-          EMAIL_RELATORIO_DESTINO: ${{ secrets.EMAIL_RELATORIO_DESTINO }}
-        run: python3 .github/scripts/relatorio_pipeline.py
+          URL_APP: ${{ steps.publicar.outputs.webapp-url }}
+        run: |
+          validar() {
+            local caminho="$1"
+            for tentativa in $(seq 1 18); do
+              status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 30 "$URL_APP$caminho" || true)
+              if [ "$status" = "200" ]; then
+                echo "OK  $caminho -> $status"
+                return 0
+              fi
+              echo "Aguardando $caminho (tentativa $tentativa/18, status $status)..."
+              sleep 10
+            done
+            echo "::error title=Validação pós-deploy::$caminho não respondeu 200."
+            return 1
+          }
+          validar /openapi/v1.json
+          validar /scalar
+          {
+            echo "### Deploy concluído"
+            echo ""
+            echo "- Aplicação: $URL_APP"
+            echo "- Documentação (Scalar): $URL_APP/scalar"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Orientar o rollback
+        if: failure()
+        run: |
+          {
+            echo "### Falha no deploy"
+            echo ""
+            echo "A aplicação publicada não passou na validação ou a publicação falhou."
+            echo "Para voltar à versão anterior: abra a última execução bem-sucedida deste workflow"
+            echo "e use **Re-run jobs** no job Deploy, ou reverta o commit na main."
+            echo "Logs: Azure Portal > App Service > Log stream."
+          } >> "$GITHUB_STEP_SUMMARY"

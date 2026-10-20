@@ -238,32 +238,27 @@ O workflow [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml) tem três 
 |-----|------------|----------------|
 | `build` | push e pull request na `main` | **ativo**: instala o SDK do `global.json`, restaura e compila a solution em `Release` |
 | `test` | depois do `build` | **ativo**: executa `dotnet test` sem a suíte `QualidadeIA` e publica os resultados (`.trx`) como artefato |
-| `deploy` | depois do `test`, apenas em push na `main` | esqueleto: só imprime mensagens; nenhum recurso do Azure é alterado |
-| `relatorio` | sempre, depois de todos os jobs, com sucesso ou falha | **ativo**: envia por e-mail o relatório da execução e o grava no resumo da execução |
+| `build` (publicação) | no mesmo job | **ativo**: gera o pacote da API com `dotnet publish` e o guarda como artefato `api-publicacao` |
+| `deploy` | depois de `build` e `test` com sucesso, apenas na `main` (push ou disparo manual) | **ativo**: aguarda aprovação no environment `production`, faz login no Azure por OIDC, publica no App Service e valida a aplicação |
 
-### Relatório por e-mail
+Se os testes falharem, não há deploy. Pull requests nunca publicam.
 
-O job `relatorio` executa [.github/scripts/relatorio_pipeline.py](.github/scripts/relatorio_pipeline.py), que usa apenas a biblioteca padrão do Python. O e-mail traz:
+### Deploy no Azure
 
-- resultado geral (sucesso, falha ou cancelado) no assunto e no topo;
-- repositório, evento, branch, commit, autor, início e duração;
-- cada job e cada etapa executada, com resultado e duração;
-- totais de testes (aprovados, com falha, não executados) e o nome dos testes que falharam;
-- link para a execução no GitHub Actions.
+| Item | Valor |
+|------|-------|
+| Aplicação | https://documentai-gmaurity.azurewebsites.net |
+| Documentação (Scalar) | https://documentai-gmaurity.azurewebsites.net/scalar |
+| Recursos | grupo `rg-documentai`, plano `asp-documentai-free` (F1 gratuito, Linux, `centralus`), App Service `documentai-gmaurity` (.NET 10) |
+| Provisionamento | [infra/provisionar-azure.ps1](infra/provisionar-azure.ps1) (Azure CLI, reexecutável) |
 
-O envio usa SMTP e é configurado por *secrets* do repositório (*Settings → Secrets and variables → Actions*). O destinatário também fica em *secret* para não expor o endereço no repositório público:
+- **Autenticação sem segredos:** o workflow entra no Azure com a identidade gerenciada `id-documentai-github` por **OIDC**. A credencial federada só aceita tokens do environment `production` deste repositório, e a identidade tem apenas o papel *Website Contributor* no App Service.
+- **Aprovação:** o environment `production` exige a aprovação de um revisor antes de cada publicação e só aceita a branch `main`. Ele guarda os secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` e `AZURE_SUBSCRIPTION_ID` e a variável `AZURE_WEBAPP_NAME`.
+- **Validação pós-deploy:** o job espera `200` em `/openapi/v1.json` e `/scalar`. Quando o endpoint `/health` existir (tarefa 6.3), ele passa a ser a verificação principal.
+- **Rollback:** se a publicação ou a validação falhar, o resumo da execução orienta a reexecutar o job Deploy da última execução bem-sucedida ou a reverter o commit na `main`.
+- **Limites do plano F1:** 60 minutos de CPU por dia e nenhum *Always On*. A aplicação dorme quando fica ociosa, e a primeira requisição depois disso pode demorar alguns segundos.
 
-| Secret | Exemplo | Descrição |
-|--------|---------|-----------|
-| `SMTP_SERVIDOR` | `smtp.gmail.com` | Servidor SMTP |
-| `SMTP_PORTA` | `465` | `465` (SSL) ou `587` (STARTTLS); padrão `465` |
-| `SMTP_USUARIO` | conta que envia | Também usado como remetente |
-| `SMTP_SENHA` | senha de app | No Gmail, uma [senha de app](https://myaccount.google.com/apppasswords), nunca a senha da conta |
-| `EMAIL_RELATORIO_DESTINO` | quem recebe | Destinatário do relatório |
-
-Sem esses secrets, o relatório aparece só no resumo da execução e o job emite um aviso, sem falhar o pipeline. Em pull requests vindos de *forks*, o GitHub não disponibiliza os secrets, e o e-mail não é enviado.
-
-O restante (cobertura mínima, varredura de segredos e publicação no Azure App Service via OIDC com aprovação manual) está planejado nas tarefas 10.3 a 10.5 de [docs/tasks.md](docs/tasks.md).
+Cobertura mínima e varredura de segredos no CI ainda estão pendentes (tarefa 10.3 de [docs/tasks.md](docs/tasks.md)).
 
 ---
 
