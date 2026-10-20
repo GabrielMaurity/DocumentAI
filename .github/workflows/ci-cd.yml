@@ -1,0 +1,62 @@
+# Pipeline de CI/CD do DocumentAI.
+#
+# Esqueleto inicial: os jobs apenas imprimem mensagens de teste.
+# A implementação real segue as tarefas 10.3 e 10.4 de docs/tasks.md
+# e a skill .agents/skills/azure-deployment.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Menor privilégio: cada job só recebe permissões adicionais quando precisar.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build (placeholder)
+        run: |
+          echo "Build: etapa de teste do pipeline."
+          echo "Futuramente: setup do .NET 10, dotnet restore, dotnet build -c Release e dotnet publish."
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test (placeholder)
+        run: |
+          echo "Test: etapa de teste do pipeline."
+          echo "Futuramente: dotnet test sem a categoria QualidadeIA, cobertura mínima de 80% e varredura de segredos."
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: test
+    # Publica apenas em push na main; nunca em pull requests.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Futuramente: environment "production" com revisores obrigatórios
+    # e "id-token: write" para autenticação no Azure via OIDC.
+    steps:
+      - name: Deploy (placeholder)
+        run: |
+          echo "Deploy: etapa de teste do pipeline. Nenhum recurso do Azure é alterado."
+          echo "Futuramente: azure/login via OIDC, publicação no Azure App Service e verificação de GET /health."
