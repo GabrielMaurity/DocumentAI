@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <!-- Os comentários XML alimentam o documento OpenAPI exibido no Scalar. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="OpenApi\descricao-api.md" LogicalName="DocumentAI.API.OpenApi.descricao-api.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A referência à Infrastructure existe apenas para a composição do DI no Program.cs (architecture.md, seção 4). -->
+    <ProjectReference Include="..\DocumentAI.Application\DocumentAI.Application.csproj" />
+    <ProjectReference Include="..\DocumentAI.Infrastructure\DocumentAI.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

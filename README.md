@@ -4,7 +4,7 @@ API corporativa em ASP.NET Core para análise inteligente de documentos com Open
 
 O cliente envia o título e o conteúdo textual de um documento e recebe uma análise em JSON estruturado: tipo do documento, resumo objetivo, palavras-chave, nível de risco (`BAIXO`, `MEDIO` ou `ALTO`) e pontos de atenção.
 
-> **Status:** fase de especificação. Os documentos de requisitos, arquitetura, especificação e tarefas estão prontos para aprovação. A implementação ainda não começou e depende das decisões listadas em [docs/architecture.md](docs/architecture.md#10-decisões-arquiteturais-que-precisam-de-aprovação).
+> **Status:** solution e estrutura de projetos criadas, com a documentação web (Scalar) publicada. Os endpoints e a integração com a OpenAI ainda estão em implementação. O andamento fica em [docs/tasks.md](docs/tasks.md).
 
 ---
 
@@ -124,12 +124,19 @@ O detalhamento das camadas, do fluxo de requisição, do tratamento de erros e d
 │   ├── architecture.md
 │   ├── specifications.md
 │   └── tasks.md
+├── src/
+│   ├── DocumentAI.API/
+│   ├── DocumentAI.Application/
+│   ├── DocumentAI.Domain/
+│   └── DocumentAI.Infrastructure/
+├── tests/
+│   └── DocumentAI.Tests/
 ├── AGENTS.md                Instruções para agentes de IA
-├── DocumentoAI.sln          Solution (será renomeada para DocumentAI.sln — decisão D-01)
+├── Directory.Build.props    Propriedades comuns de build (.NET 10, nullable, analisadores)
+├── DocumentAI.sln
+├── global.json              Versão do SDK do .NET
 └── README.md
 ```
-
-Os projetos `src/` e `tests/` serão criados na fase 1 de [docs/tasks.md](docs/tasks.md).
 
 ---
 
@@ -177,8 +184,6 @@ Sem a chave, a aplicação inicia normalmente, mas `GET /health` retorna `503` (
 
 ## Como executar
 
-> Disponível após a implementação. Os comandos abaixo descrevem o uso previsto.
-
 Pré-requisito: [SDK do .NET 10](https://dotnet.microsoft.com/download).
 
 ```bash
@@ -190,8 +195,21 @@ dotnet user-secrets set "OpenAI:ApiKey" "<sua-chave>" --project src/DocumentAI.A
 ```
 
 ```bash
-dotnet run --project src/DocumentAI.API
+dotnet run --project src/DocumentAI.API --launch-profile https
 ```
+
+A configuração da chave é necessária só quando a integração com a OpenAI estiver implementada.
+
+### Documentação interativa (Scalar)
+
+A API publica uma documentação web para ler o contrato e testar os endpoints, **em desenvolvimento e em produção**:
+
+| Recurso | Desenvolvimento | Produção |
+|---------|-----------------|----------|
+| Scalar | https://localhost:7041/scalar | `https://<app>.azurewebsites.net/scalar` |
+| Documento OpenAPI | https://localhost:7041/openapi/v1.json | `https://<app>.azurewebsites.net/openapi/v1.json` |
+
+Pelo Visual Studio, o perfil de execução já abre o Scalar no navegador.
 
 ---
 
@@ -218,11 +236,11 @@ O workflow [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml) tem três 
 
 | Job | Executa em | Situação atual |
 |-----|------------|----------------|
-| `build` | push e pull request na `main` | mensagem de teste |
-| `test` | depois do `build` | mensagem de teste |
-| `deploy` | depois do `test`, apenas em push na `main` | mensagem de teste; nenhum recurso do Azure é alterado |
+| `build` | push e pull request na `main` | **ativo**: instala o SDK do `global.json`, restaura e compila a solution em `Release` |
+| `test` | depois do `build` | **ativo**: executa `dotnet test` sem a suíte `QualidadeIA` e publica os resultados (`.trx`) como artefato |
+| `deploy` | depois do `test`, apenas em push na `main` | esqueleto: só imprime mensagens; nenhum recurso do Azure é alterado |
 
-A implementação real (build e testes do .NET, cobertura, varredura de segredos e publicação no Azure App Service via OIDC com aprovação manual) está planejada nas tarefas 10.3 a 10.5 de [docs/tasks.md](docs/tasks.md).
+O restante (cobertura mínima, varredura de segredos e publicação no Azure App Service via OIDC com aprovação manual) está planejado nas tarefas 10.3 a 10.5 de [docs/tasks.md](docs/tasks.md).
 
 ---
 

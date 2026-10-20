@@ -13,7 +13,14 @@ A API tem exatamente dois endpoints:
 | `POST` | `/api/documentos/analisar` | Analisa um documento com IA | RF-01 a RF-08 |
 | `GET` | `/health` | Informa se a aplicação está saudável | RF-09 |
 
-O documento OpenAPI gerado pelo ASP.NET Core (CA-08.5) fica disponível **somente em desenvolvimento** e não faz parte do contrato publicado.
+Além deles, a API publica sua **documentação web** em todos os ambientes, inclusive produção (decisão D-15 de architecture.md):
+
+| Método | Rota | Finalidade |
+|--------|------|------------|
+| `GET` | `/openapi/v1.json` | Documento OpenAPI 3.1 gerado pelo ASP.NET Core (CA-08.5) |
+| `GET` | `/scalar` | Interface do Scalar para ler a documentação e testar os endpoints |
+
+Essas rotas documentam o contrato, mas não fazem parte dele: clientes da API não devem depender delas.
 
 > **Mudança de rota:** a rota oficial é `/api/documentos/analisar`, já adotada em architecture.md. O requirements.md ainda usa `/api/documentos/analise` e será atualizado na tarefa 0.2 de [tasks.md](tasks.md), que depende de autorização para alterar requisitos.
 
@@ -559,7 +566,7 @@ Os critérios de requirements.md continuam valendo. Os abaixo os detalham e se r
 | CE-09 | As regras de normalização e rejeição da seção 4.4 são aplicadas exatamente na ordem descrita. | RF-05, RF-07, D-07 |
 | CE-10 | A requisição enviada à OpenAI usa `json_schema` com `strict: true` e o schema da seção 4.3. | Arquitetura 3.3 |
 | CE-11 | `GET /health` retorna exatamente os corpos da seção 5.3, sem chamar a OpenAI. | RF-09 |
-| CE-12 | A API não expõe outros endpoints além dos da seção 1.1, exceto o OpenAPI em desenvolvimento. | Escopo |
+| CE-12 | A API não expõe outros endpoints além dos da seção 1.1, incluindo as duas rotas de documentação. | Escopo |
 | CE-13 | Toda resposta de erro, inclusive `404`, `405` e `413` gerados pelo framework, usa `application/problem+json` com os campos da seção 2. A exceção é o `503` do Health Check. | RNF-05, seção 2 |
 | CE-14 | O serviço de aplicação rejeita entrada inválida sem chamar a IA, mesmo quando chamado fora da API. | RF-02, architecture.md 3.2 |
 
@@ -681,4 +688,4 @@ Executados manualmente ou no pipeline após cada publicação.
 | T-80 | `GET https://<app>.azurewebsites.net/health` | `200` com `{"status":"Healthy"}` | CA-N07.2 |
 | T-81 | `POST https://<app>.azurewebsites.net/api/documentos/analisar` com o exemplo da seção 3.1 | `200` com corpo válido contra o schema 3.4 | CA-N07.3 |
 | T-82 | `GET http://<app>.azurewebsites.net/health` (HTTP) | Redirecionado para HTTPS | CA-N07.5 |
-| T-83 | `GET https://<app>.azurewebsites.net/openapi/v1.json` | `404` (OpenAPI não exposto em produção) | CE-12 |
+| T-83 | `GET https://<app>.azurewebsites.net/openapi/v1.json` e `GET https://<app>.azurewebsites.net/scalar` | `200` nos dois; no Scalar, **Test Request** em `GET /health` retorna `200` pela própria página | CE-12, D-15 |

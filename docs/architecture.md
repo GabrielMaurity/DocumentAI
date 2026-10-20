@@ -18,7 +18,7 @@ Escolhas tecnológicas:
 | Configuração | Options pattern (`IOptions<T>`) + variáveis de ambiente |
 | Tempo e prazos | `TimeProvider` (nativo do .NET), injetado onde há tempo limite |
 | Health Check | `Microsoft.Extensions.Diagnostics.HealthChecks` |
-| Documentação da API | `Microsoft.AspNetCore.OpenApi` (OpenAPI nativo do .NET), exposto apenas em desenvolvimento |
+| Documentação da API | `Microsoft.AspNetCore.OpenApi` (OpenAPI nativo do .NET) + **Scalar** (`Scalar.AspNetCore`) como interface web de testes, disponíveis em **todos os ambientes** (decisão D-15) |
 | Testes | **xUnit**, `Microsoft.AspNetCore.Mvc.Testing` (`WebApplicationFactory`), coverlet |
 
 ---
@@ -37,7 +37,7 @@ DocumentAI.sln                        (ver decisão D-01)
 └── docs/
 ```
 
-A solution existente, `DocumentoAI.sln`, será renomeada para `DocumentAI.sln`, o nome usado pelos projetos e pelo [AGENTS.md](../AGENTS.md) (decisão D-01).
+A solution se chama `DocumentAI.sln`, o mesmo nome dos projetos e do [AGENTS.md](../AGENTS.md) (decisão D-01, aplicada). O SDK é fixado por `global.json` (.NET 10, `rollForward: latestFeature`).
 
 Configuração de build comum:
 - todos os projetos têm `TargetFramework` igual a `net10.0` (CA-N01.1), com `Nullable` e `ImplicitUsings` habilitados;
@@ -125,10 +125,14 @@ A camada de entrada HTTP e a **raiz de composição** (*composition root*) da ap
   - `[ApiController]`, para validação automática do modelo e resposta `400` em `ValidationProblemDetails` (CA-02.5, CA-02.6);
   - `[Consumes("application/json")]`, para retornar `415` em outros tipos de conteúdo (CA-01.2);
   - `[RequestSizeLimit]` de 256 KB, para rejeitar com `413` corpos muito maiores que o necessário antes de desserializá-los. O padrão do Kestrel é 30 MB; 256 KB acomoda 50.000 caracteres mesmo com acentos e escapes JSON;
-  - `[ProducesResponseType]` para 200, 400, 413, 415, 500, 502, 503 e 504, para documentar o contrato no OpenAPI (CA-08.5);
+  - `[ProducesResponseType]` para 200, 400, 413, 415, 500, 502, 503 e 504, e comentários XML, para documentar o contrato no OpenAPI e no Scalar (CA-08.5);
   - depende apenas de `IAnaliseDocumentoService`;
   - recebe `CancellationToken` (associado a `HttpContext.RequestAborted`) e o repassa.
 - `GlobalExceptionHandler : IExceptionHandler`: o ponto único de tratamento de exceções (seção 7).
+- Expor a documentação web em todos os ambientes (decisão D-15): o documento OpenAPI em `/openapi/v1.json` e a interface do Scalar em `/scalar`. A configuração fica em `OpenApi/DocumentacaoApiExtensions.cs`:
+  - a descrição geral da API (contrato, códigos de status, formato de erro e roteiro de testes) é um arquivo Markdown incorporado ao assembly (`OpenApi/descricao-api.md`);
+  - o documento OpenAPI não declara servidores, para que o Scalar envie as requisições à mesma origem da página, em DEV e em PROD, inclusive atrás do proxy HTTPS do App Service;
+  - os recursos de nuvem da Scalar (ferramentas de desenvolvedor, assistente de IA, MCP, geração de SDK) e a telemetria ficam desligados.
 - Mapear o Health Check em `GET /health` com um *response writer* que expõe apenas o status (CA-09.5).
 - Configurar a serialização JSON: camelCase e UTF-8 (CA-01.5, CA-08.1).
 - Expor `public partial class Program` para os testes de integração com `WebApplicationFactory<Program>`.
@@ -418,12 +422,12 @@ Cobrem os critérios que dependem do comportamento do modelo (CA-03.2, CA-05.3, 
 
 Cada decisão traz uma recomendação. As escolhas descritas nas seções anteriores já seguem essas recomendações e mudam se a decisão for diferente.
 
-### D-01 — Nome da solution e dos projetos
+### D-01 — Nome da solution e dos projetos — **aplicada**
 **Contexto:** a solution criada se chama `DocumentoAI.sln`, os projetos se chamam `DocumentAI.*`, e requirements.md usa `DocumentoAI`. O [AGENTS.md](../AGENTS.md) define os projetos como `DocumentAI.*`, o que já descarta renomear os projetos.
 **Opções:** (a) renomear a solution para `DocumentAI.sln` e padronizar tudo como `DocumentAI`; (b) manter `DocumentoAI.sln` com projetos `DocumentAI.*`.
 **Recomendação:** (a). Um único nome evita confusão em namespaces, pacotes e no App Service. A seção 1 de requirements.md seria ajustada.
 
-### D-02 — Um projeto de testes em vez de dois
+### D-02 — Um projeto de testes em vez de dois — **aplicada**
 **Contexto:** o CA-N06.1 exige "pelo menos um projeto de testes unitários e um de integração", mas a estrutura pedida tem um único `DocumentAI.Tests`.
 **Opções:** (a) um projeto com pastas `Unit/`, `Integration/`, `Architecture/` e `Quality/`, e o CA-N06.1 reescrito para exigir essas categorias, não projetos; (b) separar em `DocumentAI.UnitTests` e `DocumentAI.IntegrationTests`.
 **Recomendação:** (a). É mais simples para o tamanho do projeto, e as categorias podem ser filtradas com `--filter`. Requer atualizar o CA-N06.1.
@@ -460,9 +464,10 @@ Cada decisão traz uma recomendação. As escolhas descritas nas seções anteri
 **Opções:** (a) `503 Service Unavailable`; (b) `500 Internal Server Error`.
 **Recomendação:** (a), por coerência com o Health Check. Requer acrescentar o caso a RF-08/RNF-05.
 
-### D-10 — Versão do xUnit
+### D-10 — Versão do xUnit — **aplicada**
 **Opções:** (a) xUnit v3; (b) xUnit v2.
-**Recomendação:** (a). O v3 permite ignorar um teste em tempo de execução (`Assert.Skip`), que é o necessário para pular a suíte `QualidadeIA` sem chave (seção 8.5) sem extensões de terceiros.
+**Decisão:** (a), com o *runner* VSTest (pacote `xunit.v3.mtp-off`), que mantém os comandos `dotnet test --filter` e `--collect` usados neste documento.
+**Recomendação original:** (a). O v3 permite ignorar um teste em tempo de execução (`Assert.Skip`), que é o necessário para pular a suíte `QualidadeIA` sem chave (seção 8.5) sem extensões de terceiros.
 
 ### D-11 — Biblioteca de *test doubles*
 **Opções:** (a) *fakes* escritos à mão; (b) NSubstitute; (c) Moq.
@@ -481,10 +486,15 @@ Cada decisão traz uma recomendação. As escolhas descritas nas seções anteri
 **Opções:** (a) infraestrutura como código com Bicep; (b) criação manual pelo portal ou pela CLI, com o passo a passo documentado.
 **Recomendação:** (a). Torna o ambiente reprodutível e revisável em *pull request*. Como o AGENTS.md pede para não acrescentar tecnologias desnecessárias, a opção (b) é aceitável se houver um único ambiente.
 
+### D-15 — Documentação web em todos os ambientes — **decidida pelo solicitante**
+**Decisão:** Scalar como interface de documentação e testes, com o documento OpenAPI, disponível em DEV e em PROD (solicitação de 2026-10-20). Substitui a regra anterior de expor o OpenAPI apenas em desenvolvimento.
+**Consequência:** enquanto a autenticação (D-12) não estiver definida, qualquer pessoa com a URL de produção consegue ver o contrato e enviar requisições pela página, o que gera custo na OpenAI. Quando D-12 for decidida, avaliar se `/scalar` e `/openapi/v1.json` em produção exigem autenticação.
+
 ---
 
 ## 11. Histórico de revisões
 
 | Data | Revisão | Itens aplicados |
 |------|---------|-----------------|
+| 2026-10-20 | Criação da solution e dos projetos (tarefas 1.1–1.3 e 2.1) | D-01, D-02 e D-10 aplicadas. Nova decisão D-15: OpenAPI + Scalar em todos os ambientes (1, 3.4). |
 | 2026-10-20 | Revisão com a skill `dotnet-architecture` | **V1** normalização movida da Infrastructure para o Domain (3.1, 3.3, 5.1). **V2** todos os erros do framework em Problem Details (7.1). **V3** verificação de entrada no serviço de aplicação (3.2, 5.1). **DI-1** removida a dependência de log da Application (4). **DI-2** testes de arquitetura por reflexão, sem NetArchTest (8.4). **I-1** rota `/api/documentos/analisar`. **I-2** nome da solution (2, D-01). **I-3** padrão `"Indeterminado"` só no Domain. **I-4** D-13 resolvida (9, 10). **I-5** analisadores movidos para a configuração de build (2). **M1** `TimeProvider` (1, 3.3, 8). **M2** constantes de limites no Domain (3.1). **M3** limite de 256 KB no corpo (3.4, 5). **M4** destino dos logs no Azure (9). **M5** tempos de vida no DI (3.6). Não aplicado: **M6** (*rate limiting*), por exigir requisito novo. |

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\DocumentAI.Application\DocumentAI.Application.csproj" />
+    <ProjectReference Include="..\DocumentAI.Domain\DocumentAI.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

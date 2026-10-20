@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Núcleo do sistema: não referencia nenhum projeto nem pacote externo (architecture.md, seção 4). -->
+
+</Project>

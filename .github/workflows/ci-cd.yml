@@ -1,8 +1,8 @@
 # Pipeline de CI/CD do DocumentAI.
 #
-# Esqueleto inicial: os jobs apenas imprimem mensagens de teste.
-# A implementação real segue as tarefas 10.3 e 10.4 de docs/tasks.md
-# e a skill .agents/skills/azure-deployment.
+# Build e Test executam a compilação e os testes reais da solution.
+# Deploy ainda é um esqueleto: apenas imprime mensagens e não altera nenhum recurso do Azure.
+# A evolução segue as tarefas 10.3 e 10.4 de docs/tasks.md e a skill .agents/skills/azure-deployment.
 
 name: CI/CD
 
@@ -21,6 +21,12 @@ concurrency:
   group: ci-cd-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  SOLUTION: DocumentAI.sln
+  CONFIGURATION: Release
+
 jobs:
   build:
     name: Build
@@ -29,10 +35,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build (placeholder)
-        run: |
-          echo "Build: etapa de teste do pipeline."
-          echo "Futuramente: setup do .NET 10, dotnet restore, dotnet build -c Release e dotnet publish."
+      - name: Instalar o SDK do .NET (versão do global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restaurar dependências
+        run: dotnet restore ${{ env.SOLUTION }}
+
+      - name: Compilar
+        run: dotnet build ${{ env.SOLUTION }} --configuration ${{ env.CONFIGURATION }} --no-restore
 
   test:
     name: Test
@@ -42,10 +54,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Test (placeholder)
-        run: |
-          echo "Test: etapa de teste do pipeline."
-          echo "Futuramente: dotnet test sem a categoria QualidadeIA, cobertura mínima de 80% e varredura de segredos."
+      - name: Instalar o SDK do .NET (versão do global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restaurar dependências
+        run: dotnet restore ${{ env.SOLUTION }}
+
+      # A suíte QualidadeIA usa a OpenAI real e roda só sob demanda (architecture.md, seção 8.5).
+      - name: Executar os testes
+        run: >-
+          dotnet test ${{ env.SOLUTION }}
+          --configuration ${{ env.CONFIGURATION }}
+          --no-restore
+          --filter "Categoria!=QualidadeIA"
+          --logger trx
+          --results-directory TestResults
+
+      - name: Publicar os resultados dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-testes
+          path: TestResults/*.trx
+          if-no-files-found: warn
 
   deploy:
     name: Deploy

@@ -66,7 +66,7 @@ A fase 8 começa assim que existir algo testável: os testes de domínio (8.2) d
 | 6.1 | Configurar o `Program.cs` | 4.5, 5.2 |
 | 6.2 | Implementar `DocumentosController` | 6.1 |
 | 6.3 | Mapear `GET /health` | 5.7, 6.1 |
-| 6.4 | Expor OpenAPI apenas em desenvolvimento | 6.2 |
+| 6.4 | Documentar a API com OpenAPI e Scalar em todos os ambientes | 6.2 |
 | 7.1 | Implementar as validações da requisição | 4.1, 6.2 |
 | 7.2 | Padronizar as respostas Problem Details | 6.1 |
 | 7.3 | Implementar `GlobalExceptionHandler` | 4.2, 7.2 |
@@ -131,36 +131,36 @@ Corrigir as divergências conhecidas entre os documentos.
 **Depende de:** 0.2
 
 **Concluída quando:**
-- [ ] A pasta é um repositório Git com um `.gitignore` para .NET (gerado por `dotnet new gitignore`).
-- [ ] `.gitignore` exclui `bin/`, `obj/`, `.vs/`, `*.user` e `TestResults/`.
-- [ ] O primeiro commit contém apenas `docs/`, a solution existente e o `.gitignore`.
+- [x] A pasta é um repositório Git com um `.gitignore` para .NET (gerado por `dotnet new gitignore`).
+- [x] `.gitignore` exclui `bin/`, `obj/`, `.vs/`, `*.user` e `TestResults/`.
+- [x] O primeiro commit contém apenas `docs/`, a solution existente e o `.gitignore`. *(O commit `0e7a637` incluiu também README, AGENTS.md, skills e o workflow, a pedido.)*
 
 #### 1.2 — Configurar SDK e propriedades comuns de build
 **Depende de:** 1.1
 
 **Concluída quando:**
-- [ ] `global.json` fixa o SDK .NET 10 (`10.0.x`, com `rollForward: latestFeature`).
-- [ ] `Directory.Build.props` na raiz define `TargetFramework` `net10.0`, `Nullable` `enable`, `ImplicitUsings` `enable` e `LangVersion` `latest`.
-- [ ] Um `Directory.Build.props` em `src/` ativa `TreatWarningsAsErrors` apenas nos projetos de produção.
-- [ ] O pacote de analisadores `Microsoft.VisualStudio.Threading.Analyzers` está configurado para todos os projetos, com as regras de bloqueio síncrono (`.Result`, `.Wait()`, `GetAwaiter().GetResult()`) como erro (CA-N02.2; architecture.md, seção 2).
+- [x] `global.json` fixa o SDK .NET 10 (`10.0.x`, com `rollForward: latestFeature`).
+- [x] `Directory.Build.props` na raiz define `TargetFramework` `net10.0`, `Nullable` `enable`, `ImplicitUsings` `enable` e `LangVersion` `latest`.
+- [x] Um `Directory.Build.props` em `src/` ativa `TreatWarningsAsErrors` apenas nos projetos de produção.
+- [x] O pacote de analisadores `Microsoft.VisualStudio.Threading.Analyzers` está configurado para todos os projetos, com as regras de bloqueio síncrono (`.Result`, `.Wait()`, `GetAwaiter().GetResult()`) como erro (CA-N02.2; architecture.md, seção 2).
 
 #### 1.3 — Criar a solution e os projetos
 **Depende de:** 1.2
 
 **Concluída quando:**
-- [ ] A solution tem o nome definido em D-01.
-- [ ] Os projetos existem nas pastas de architecture.md, seção 2:
+- [x] A solution tem o nome definido em D-01.
+- [x] Os projetos existem nas pastas de architecture.md, seção 2:
   - `src/DocumentAI.API` (template `webapi`, com Controllers);
   - `src/DocumentAI.Application` (`classlib`);
   - `src/DocumentAI.Domain` (`classlib`);
   - `src/DocumentAI.Infrastructure` (`classlib`);
-  - `tests/DocumentAI.Tests` (xUnit, na versão definida em D-10).
-- [ ] Os cinco projetos estão na solution, agrupados nas pastas de solution `src` e `tests`.
-- [ ] O código de exemplo dos templates foi removido (`WeatherForecast`, `Class1`, `UnitTest1`).
-- [ ] Os pacotes e arquivos de Swagger/Swashbuckle do template foram removidos (o OpenAPI nativo é configurado em 6.4).
-- [ ] Nenhum projeto declara `TargetFramework` próprio: todos herdam `net10.0` do `Directory.Build.props` (CA-N01.1).
-- [ ] `dotnet build` na raiz termina sem erros (CA-N01.3).
-- [ ] A solution abre no Visual Studio com os cinco projetos carregados.
+  - `tests/DocumentAI.Tests` (xUnit v3 com *runner* VSTest, conforme D-10).
+- [x] Os cinco projetos estão na solution, agrupados nas pastas de solution `src` e `tests`.
+- [x] O código de exemplo dos templates foi removido (`WeatherForecast`, `Class1`, `UnitTest1`).
+- [x] Os pacotes e arquivos de Swagger/Swashbuckle do template foram removidos (o template do .NET 10 já não inclui Swashbuckle; o OpenAPI nativo e o Scalar estão configurados, ver 6.4).
+- [x] Nenhum projeto declara `TargetFramework` próprio: todos herdam `net10.0` do `Directory.Build.props` (CA-N01.1).
+- [x] `dotnet build` na raiz termina sem erros (CA-N01.3).
+- [ ] A solution abre no Visual Studio com os cinco projetos carregados. *(Pendente de conferência manual; `dotnet sln list` lista os cinco projetos.)*
 
 ---
 
@@ -172,12 +172,12 @@ Corrigir as divergências conhecidas entre os documentos.
 Aplicar a tabela de architecture.md, seção 4.
 
 **Concluída quando:**
-- [ ] `Domain` não referencia nenhum projeto.
-- [ ] `Application` referencia apenas `Domain`.
-- [ ] `Infrastructure` referencia `Application` e `Domain`.
-- [ ] `API` referencia `Application` e `Infrastructure`.
-- [ ] `Tests` referencia os quatro projetos.
-- [ ] `dotnet build` termina sem erros.
+- [x] `Domain` não referencia nenhum projeto.
+- [x] `Application` referencia apenas `Domain`.
+- [x] `Infrastructure` referencia `Application` e `Domain`.
+- [x] `API` referencia `Application` e `Infrastructure`.
+- [x] `Tests` referencia os quatro projetos.
+- [x] `dotnet build` termina sem erros.
 
 #### 2.2 — Adicionar os pacotes NuGet
 **Depende de:** 2.1
@@ -186,7 +186,7 @@ Aplicar a tabela de architecture.md, seção 4.
 - [ ] `Domain` não tem nenhum pacote.
 - [ ] `Application` tem apenas `Microsoft.Extensions.DependencyInjection.Abstractions` (sem pacote de log; architecture.md, seção 4).
 - [ ] `Infrastructure` tem `OpenAI` (ou `Azure.AI.OpenAI`, conforme D-03), `Microsoft.Extensions.Options.ConfigurationExtensions` e `Microsoft.Extensions.Diagnostics.HealthChecks`.
-- [ ] `API` tem `Microsoft.AspNetCore.OpenApi`.
+- [x] `API` tem `Microsoft.AspNetCore.OpenApi` e `Scalar.AspNetCore` (adicionados na criação da solution).
 - [ ] `Tests` tem xUnit (D-10), `Microsoft.AspNetCore.Mvc.Testing`, `coverlet.collector`, uma biblioteca de validação de JSON Schema (CA-08.2), `Microsoft.Extensions.TimeProvider.Testing` e a biblioteca de *test doubles*, se houver (D-11).
 - [ ] Não há biblioteca de testes de arquitetura: as regras são verificadas por reflexão (tarefa 2.3).
 - [ ] Todas as versões estão fixadas e são estáveis (nenhuma prévia).
@@ -402,14 +402,18 @@ Implementar architecture.md, seção 6.
 - [ ] O corpo contém apenas o campo `status`.
 - [ ] A resposta tem `Content-Type: application/json` e `Cache-Control: no-store, no-cache`.
 
-#### 6.4 — Expor OpenAPI apenas em desenvolvimento
-**Depende de:** 6.2
+#### 6.4 — Documentar a API com OpenAPI e Scalar em todos os ambientes
+**Depende de:** 6.2 *(a infraestrutura de documentação foi antecipada na criação da solution, a pedido; falta documentar os endpoints quando existirem)*
 
 **Concluída quando:**
-- [ ] `AddOpenApi` está registrado e `MapOpenApi` só é chamado no ambiente `Development`.
-- [ ] O documento gerado descreve o request, o response e os status de 6.2 (CA-08.5).
-- [ ] Fora de `Development`, `/openapi/v1.json` retorna `404`.
-- [ ] Não existe nenhum endpoint além dos de specifications.md, seção 1.1 (CE-12).
+- [x] `AddOpenApi` está registrado e `MapOpenApi` é chamado em todos os ambientes (decisão D-15).
+- [x] O Scalar está em `/scalar`, em DEV e em PROD, sem recursos de nuvem da Scalar e sem telemetria.
+- [x] O documento tem título, versão e uma descrição detalhada (contrato, códigos de status, formato de erro, roteiro de testes) vinda de `OpenApi/descricao-api.md`.
+- [x] O documento não declara servidores, para que o Scalar teste na mesma origem da página.
+- [ ] O documento gerado descreve o request, o response e os status de 6.2 e 6.3, com comentários XML e `[ProducesResponseType]` (CA-08.5).
+- [ ] Os endpoints de 6.2 e 6.3 podem ser executados pelo botão **Test Request** do Scalar, em DEV e em PROD.
+- [ ] A descrição da API deixa de marcar os endpoints como "em implementação".
+- [x] Não existe nenhum endpoint além dos de specifications.md, seção 1.1 (CE-12).
 
 ---
 
@@ -547,7 +551,7 @@ Os cenários `T-xx` estão em specifications.md, seção 6.
 - [ ] Sem a chave, a aplicação inicia, registra o erro, `GET /health` retorna `503` e a análise retorna `503`.
 - [ ] Com uma chave inválida, a análise retorna `502` e a chave não aparece no log.
 - [ ] Os logs da sessão não contêm títulos, conteúdos nem a chave.
-- [ ] O documento OpenAPI está acessível em `Development`.
+- [ ] O documento OpenAPI e o Scalar estão acessíveis em `Development` e com `ASPNETCORE_ENVIRONMENT=Production`.
 
 #### 9.3 — Executar a suíte de qualidade da IA
 **Depende de:** 8.6, 9.1
@@ -619,3 +623,12 @@ Os cenários `T-xx` estão em specifications.md, seção 6.
 - [ ] Os cenários T-80 a T-83 de specifications.md, seção 6.9, passam no ambiente publicado (CA-N07.2, CA-N07.3, CA-N07.5).
 - [ ] Os logs do App Service mostram a inicialização sem erros de configuração e não contêm conteúdo de documentos nem a chave.
 - [ ] Todos os critérios CA-N07.x estão marcados como atendidos na revisão de rastreabilidade (9.4).
+
+---
+
+## 4. Registro de execução
+
+| Data | Tarefas | Resultado |
+|------|---------|-----------|
+| 2026-10-20 | 1.1, 1.2, 1.3, 2.1 e parte de 6.4 | Solution `DocumentAI.sln` com os cinco projetos em `src/` e `tests/`, referências conforme architecture.md, seção 4, e OpenAPI + Scalar na API. `dotnet restore` e `dotnet build`: 0 erros, 0 avisos. Nenhum pacote com vulnerabilidade conhecida. Documentação verificada em `Development` e `Production` (`/openapi/v1.json` e `/scalar` com `200`). Integração com a OpenAI não iniciada. |
+| 2026-10-20 | Parte de 10.3 | Workflow `.github/workflows/ci-cd.yml` com os jobs `build` (restore + build em `Release`) e `test` (`dotnet test` sem `QualidadeIA`, resultados `.trx` como artefato) ativos. O job `deploy` continua como esqueleto. Faltam cobertura mínima e varredura de segredos. Removida do `global.json` a configuração de *runner* Microsoft Testing Platform deixada pelo template, incompatível com o VSTest (D-10). |

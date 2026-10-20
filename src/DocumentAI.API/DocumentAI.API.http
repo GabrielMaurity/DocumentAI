@@ -1,0 +1,10 @@
+# Requisições de teste para o Visual Studio / VS Code (REST Client).
+# A documentação interativa completa está em {{host}}/scalar.
+@host = https://localhost:7041
+
+### Documento OpenAPI
+GET {{host}}/openapi/v1.json
+Accept: application/json
+
+### Documentação web (Scalar)
+GET {{host}}/scalar
