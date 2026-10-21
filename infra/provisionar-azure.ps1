@@ -71,15 +71,17 @@ az identity create --name $Identidade --resource-group $GrupoRecursos --location
 $clientId = az identity show --name $Identidade --resource-group $GrupoRecursos --query clientId -o tsv
 $principalId = az identity show --name $Identidade --resource-group $GrupoRecursos --query principalId -o tsv
 
-$sujeito = "repo:${Repositorio}:environment:${AmbienteGitHub}"
-$credencialExiste = az identity federated-credential list --identity-name $Identidade --resource-group $GrupoRecursos `
-    --query "[?subject=='$sujeito'] | length(@)" -o tsv
-if ($credencialExiste -eq "0") {
-    az identity federated-credential create --name "github-$AmbienteGitHub" `
-        --identity-name $Identidade --resource-group $GrupoRecursos `
-        --issuer "https://token.actions.githubusercontent.com" `
-        --subject $sujeito --audiences "api://AzureADTokenExchange" --output none
-}
+# O GitHub emite o "subject" do token OIDC com os IDs imutáveis do dono e do repositório
+# (repo:Dono@<id>/Repo@<id>:environment:<nome>), que não mudam se o repositório for renomeado.
+$infoRepo = Invoke-RestMethod "https://api.github.com/repos/$Repositorio"
+$sujeito = "repo:$($infoRepo.owner.login)@$($infoRepo.owner.id)/$($infoRepo.name)@$($infoRepo.id):environment:${AmbienteGitHub}"
+Write-Host "Subject OIDC: $sujeito"
+
+# "create" grava a credencial pelo nome: cria ou atualiza o subject de uma já existente.
+az identity federated-credential create --name "github-$AmbienteGitHub" `
+    --identity-name $Identidade --resource-group $GrupoRecursos `
+    --issuer "https://token.actions.githubusercontent.com" `
+    --subject $sujeito --audiences "api://AzureADTokenExchange" --output none
 
 Etapa "Permissão Website Contributor restrita ao App Service"
 $escopo = az webapp show --name $NomeApp --resource-group $GrupoRecursos --query id -o tsv
